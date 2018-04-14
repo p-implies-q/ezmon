@@ -1,0 +1,22 @@
+name: ezmon
+version: 1.0.0
+cabal-version: >= 1.18
+build-type: Simple
+
+executable ezmon
+  ghc-options: -XOverloadedStrings
+               -XNoImplicitPrelude
+               -Wall
+  main-is: Main.hs
+  hs-source-dirs:      src
+  other-modules:
+  build-depends:       X11
+                     , aeson
+                     , base
+                     , classy-prelude
+                     , directory
+                     , extra
+                     , optparse-applicative
+                     , process
+                     , safe-exceptions
+  default-language:    Haskell2010
