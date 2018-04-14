@@ -44,6 +44,12 @@ cycle` it will cycle through these commands. If I unplug my monitor and either
 `cycle` or `reset` it will detect the change in monitors and switch to the file
 corresponding to the new setup and run the first line.
 
+Adding single-button shortcuts to commands line `ezmon cycle` and/or `ezmon
+reset` or perhaps an evdev rule will help integrate this little utility very
+cleanly into your linux experience. This utility is probably a bit silly for
+people who use extensive desktop environments, but I found it makes my XMonad
+setup very comfy (especially since I work in many different places).
+
 Finally, there are `status`, `mkconfig`, and `edit` options that will display
 the current status and help in creating and editing config files. These config
 files can contain any code you want, so you could use them to launch the nukes
@@ -51,6 +57,6 @@ when switching monitors, caution is advised.
 
 ## Caveat
 `ezmon` is very much Linux only due to its reliance on the linux `sysfs` and
-xrandr. Furthermore the program author (me) is going on extended holiday very
+`xrandr`. Furthermore the program author (me) is going on extended holiday very
 soon, any alterations are probably best done by forking and running your own
 copy, I will not be available to handle pull requests for at least 6 months.
