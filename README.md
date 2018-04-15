@@ -22,6 +22,17 @@ files do not exist, the application should behave like it is starting a cycle.
 If no configuration file exists for a particular layout, the default command is
 "xrandr --auto"
 
+## Building
+
+I developed this little tool using nixos and used the nix ecosystem to manage my dependencies during the process. I am still coming to grips with the intricacies of this process, so I haven't included any of those files. To build/install this tool, a simple
+
+```
+$ cabal configure
+$ cabal build
+```
+
+should be sufficient.
+
 ## Example
 A `tree` of my `~/.config/ezmon` directory
 ```
