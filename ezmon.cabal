@@ -10,9 +10,7 @@ executable ezmon
   main-is: Main.hs
   hs-source-dirs:      src
   other-modules:
-  build-depends:       X11
-                     , aeson
-                     , base
+  build-depends:       base
                      , classy-prelude
                      , directory
                      , extra
