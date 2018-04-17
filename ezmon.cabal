@@ -10,7 +10,7 @@ executable ezmon
   main-is:              Main.hs
   hs-source-dirs:       src
   build-depends:        base
-                      , classy-prelude
+                      , classy-prelude >= 1.4
                       , directory
                       , extra
                       , optparse-applicative
