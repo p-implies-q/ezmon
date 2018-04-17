@@ -16,4 +16,5 @@ executable ezmon
                       , optparse-applicative
                       , process
                       , safe-exceptions
+                      , filepath
   default-language:     Haskell2010

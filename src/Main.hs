@@ -42,6 +42,7 @@ import           Control.Monad.Extra     (andM, ifM)
 import           Options.Applicative
 import           System.Directory
 import qualified System.Environment as E (getEnv)
+import           System.FilePath
 import           System.Process          (callCommand)
 
 -- *** Define all the types ***
@@ -109,7 +110,10 @@ readDat name = flip catchIO (const (return Nothing)) $ do
 
 -- | Get the file associated with the current set of devices
 confFile :: [Device] -> IO FilePath
-confFile ds = getXdgDirectory XdgConfig ("ezmon" </> show (hash ds))
+confFile ds = do
+  fname <- getXdgDirectory XdgConfig ("ezmon" </> show (hash ds))
+  createDirectoryIfMissing True (takeDirectory fname)
+  return fname
 
 -- | Load a configuration from file
 getConf :: [Device] -> IO (Maybe [Command])
