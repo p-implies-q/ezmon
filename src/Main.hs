@@ -43,20 +43,21 @@ import           System.Directory
 import qualified System.Environment as E (getEnv)
 import           System.Process          (callCommand)
 
+
 -- *** Define all the types ***
 
-type Port      = FilePath          -- | A place where a monitor could be plugged
-type MonitorID = Int               -- | Hash of a monitors EDID
-type Device    = (Port, MonitorID) -- | A monitor plugged into a particular port
-type Cycle     = Int               -- | Count of the position in a cycle
-type Command   = String            -- | A shell command to run
+type Port      = FilePath          -- ^ A place where a monitor could be plugged
+type MonitorID = Int               -- ^ Hash of a monitors EDID
+type Device    = (Port, MonitorID) -- ^ A monitor plugged into a particular port
+type Cycle     = Int               -- ^ Count of the position in a cycle
+type Command   = String            -- ^ A shell command to run
 
 -- | A collection of the relevant information when running
 data RunEnv = RunEnv
-  { rsDevices  :: [Device]
-  , rsCycle    :: Cycle
-  , rsRepeat   :: Bool
-  , rsCommands :: [Command]
+  { rsDevices  :: [Device]         -- ^ A list of the current devices and their ports
+  , rsCycle    :: Cycle            -- ^ The current cycle that ezmon is on
+  , rsRepeat   :: Bool             -- ^ True if the layout did not change from last call
+  , rsCommands :: [Command]        -- ^ A list of the commands for this layout
   } deriving (Eq, Show)
 
 -- | Different tasks the script can be instructed to understake
@@ -91,24 +92,38 @@ getDevices = connected >>= mapM getOne
 
 -- *** Gathering information about the environment ***
 
+
+-- | Get the configuration directory and create it if it doesn't exist
+confDir :: IO FilePath
+confDir = do
+  dir <- getXdgDirectory XdgConfig "ezmon"
+  createDirectoryIfMissing True dir
+  return dir
+
+-- | Get the data directory and create it if it doesn't exist
+dataDir :: IO FilePath
+dataDir = do
+  dir <- getXdgDirectory XdgData "ezmon"
+  createDirectoryIfMissing True dir
+  return dir
+
+-- | Get the file associated with the current set of devices
+confFile :: [Device] -> IO FilePath
+confFile ds = (</> show (hash ds)) <$> confDir
+
 -- | Save layout ID and cycle-number to drive
 saveDat :: RunEnv -> IO ()
 saveDat env = do
-  dir <- getXdgDirectory XdgData "ezmon"
-  createDirectoryIfMissing True dir
+  dir <- dataDir
   writeFileUtf8 (dir </> "layout-id") (tshow . hash . rsDevices $ env)
   writeFileUtf8 (dir </> "cycle")     (tshow . rsCycle $ env)
 
 -- | Try to read a stored variable from file and return it
 readDat :: Read a => String -> IO (Maybe a)
 readDat name = flip catchIO (const (return Nothing)) $ do
-  dir <- getXdgDirectory XdgData "ezmon"
+  dir <- dataDir
   txt <- readFileUtf8 (dir </> name)
   return $ readMay txt
-
--- | Get the file associated with the current set of devices
-confFile :: [Device] -> IO FilePath
-confFile ds = getXdgDirectory XdgConfig ("ezmon" </> show (hash ds))
 
 -- | Load a configuration from file
 getConf :: [Device] -> IO (Maybe [Command])
@@ -127,6 +142,14 @@ getEnv = RunEnv <$> devs <*> cycl <*> reps <*> cmds
       old <- readDat "layout-id"
       new <- hash <$> devs
       return $ maybe False (new ==) old
+
+-- | Start EDITOR to edit file, default to nano
+editFile :: FilePath -> IO ()
+editFile fname = do
+  editor <- catch (E.getEnv "EDITOR") f
+  callCommand $ unwords [editor, fname]
+  where f :: IOException -> IO String
+        f _ = return "nano"
 
 
 -- *** Running different commands based on instruction and env. ***
@@ -154,52 +177,49 @@ reset env = do
   saveDat env { rsCycle = 0 }
   where cmd = fromMaybe defaultCmd (rsCommands env `index` 0)
 
+-- | Create an empty configuration file for the current layout
+createConf :: RunEnv -> IO ()
+createConf ds = do
+  cfg <- confFile $ rsDevices ds
+  ifM (doesFileExist cfg)
+    (putStrLn $ "File already exists: " ++ pack cfg)
+    (writeFileUtf8 cfg mempty)
+
 -- | Give a pretty representation of a RunEnv
 pprintEnv :: RunEnv -> Text
 pprintEnv env = unlines $
   ("Layout ID: " ++ (tshow . hash . rsDevices $ env)) : zipWith f [0..] (rsCommands env)
   where f i l = (if i == rsCycle env then "* " else "  ") ++ pack l
 
-
-
 -- | Dispatch the specified task to a particular operation
 run :: RunEnv -> Task -> IO ()
--- Cycle through commands
-run env Cycle        = cycle env
--- Reset command
-run env Reset        = reset env
--- Create an empty config file for the current layout if the file does not exist
-run env CreateConfig = do
-  cfg <- confFile $ rsDevices env
-  ifM (doesFileExist cfg)
-    (putStrLn $ "File already exists: " ++ pack cfg)
-    (writeFileUtf8 cfg mempty)
--- Display some information about the current layout and configurations
-run env ShowStatus   = putStrLn $ pprintEnv env
-run env Edit         = do
-  editor <- catch (E.getEnv "EDITOR") f
-  fname  <- confFile $ rsDevices env
-  callCommand $ unwords [editor, fname]
-  where f :: IOException -> IO String
-        f _ = return "nano"
+run env Cycle        = cycle env                            -- Next monitor cycle
+run env Reset        = reset env                            -- Reset monitor cycle
+run env CreateConfig = createConf env                       -- Create empty config file
+run env ShowStatus   = putStrLn $ pprintEnv env             -- Display status
+run _ Edit           = getDevices >>= confFile >>= editFile -- Edit config file
 
--- *** Parsing command-line arguments ***
 
+-- *** Parsing command-line arguments and running ezmon ***
+
+-- | Parser for the task to be performed
 task :: Parser Task
-task = subparser $ mconcat
-  [ command "cycle" (info (pure Cycle) (progDesc "Cycle monitor configuration"))
-  , command "reset" (info (pure Reset) (progDesc "Jump to first monitor configuration"))
-  , command "mkconfig" (info (pure CreateConfig) (progDesc "Create config file for this layout"))
-  , command "status"   (info (pure ShowStatus) (progDesc "Show the status for this layout"))
-  , command "edit"     (info (pure Edit) (progDesc "Open the current config in an editor"))
-  ]
+task = subparser $ concatMap f
+  [ ("cycle"   , Cycle       , "Cycle monitor configuration")
+  , ("reset"   , Reset       , "Reset monitor cycle to first entry")
+  , ("mkconfig", CreateConfig, "Create an empty config for current layout")
+  , ("status"  , ShowStatus  , "Display current monitor status")
+  , ("edit"    , Edit        , "Open config for current layout in editor") ]
+  where f (name, cmd, desc) = command name (info (pure cmd) (progDesc desc))
 
+-- | The task parser wrapped in some information about the ezmon program
 opts :: ParserInfo Task
 opts = info (task <**> helper)
   ( fullDesc
   <> progDesc "Handle monitor-layouts"
   <> header   "ezmon - a tool for handling different monitor layouts" )
 
+-- | Collect the environment, run the parser, execute the command
 main :: IO ()
 main = do
   env  <- getEnv
