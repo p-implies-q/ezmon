@@ -156,7 +156,10 @@ editFile fname = do
 
 -- | The default command to run when no configuration file is encountered
 defaultCmd :: Command
-defaultCmd = "xrandr --auto"
+defaultCmd = "echo " ++ show msg ++ " && xrandr --auto"
+  where
+    msg :: String
+    msg = "No commands found in config, add some using 'ezmon edit'. Defaulting to 'xrandr --auto'"
 
 -- | Run the next command in the list associated with this layout, if we just
 -- switched layouts this is the same as reset, but if the layout hasn't
