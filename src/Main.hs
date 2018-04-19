@@ -37,7 +37,6 @@ If no configuration file exists for a particular layout, the default command is
 -}
 
 import           ClassyPrelude
-import           Control.Exception.Safe  (catchIO)
 import           Control.Monad.Extra     (andM, ifM)
 import           Options.Applicative
 import           System.Directory
